@@ -7,7 +7,7 @@ from __future__ import print_function, absolute_import, unicode_literals
 import random
 import sys
 
-from .MailMover import FolderMailMover
+from .MailMover import FolderMailMover, QueryMailMover
 
 try:
     from .files import watch_for_new_files, quick_find_dirs_hack
@@ -28,8 +28,13 @@ def main(options, database, query_string):
         watch_for_new_files(options, database,
                             quick_find_dirs_hack(database.db_path))
     elif options.move_mails:
+        if options.mail_move_kind == 'query':
+            moverclass = QueryMailMover
+        else:
+            moverclass = FolderMailMover
+
         for maildir, rules in options.mail_move_rules.items():
-            mover = FolderMailMover(options.mail_move_age, options.mail_move_rename, options.dry_run)
+            mover = moverclass(options.mail_move_age, options.mail_move_rename, options.dry_run)
             mover.move(maildir, rules)
             mover.close()
     else:

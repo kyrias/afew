@@ -84,6 +84,54 @@ class MailMover(Database):
             return destination
 
 
+class QueryMailMover(MailMover):
+    def __init__(self, max_age=0, rename=False, dry_run=False):
+        query = '{subquery}'
+        super(QueryMailMover, self).__init__(max_age, rename, dry_run, query)
+
+    def move(self, rule_id, rules):
+        # identify and move messages
+        logging.info("Processing rule '{}'".format(rule_id))
+        to_delete_fnames = []
+        for query in rules.keys():
+            destination = '{}/{}/cur/'.format(self.db_path, rules[query])
+            main_query = self.query.format( subquery=query)
+            logging.debug("query: {}".format(main_query))
+            messages = notmuch.Query(self.db, main_query).search_messages()
+            for message in messages:
+                # a single message (identified by Message-ID) can be in several
+                # places; only touch the one(s) that exists in this maildir
+                to_move_fnames = [name for name in message.get_filenames()]
+                if not to_move_fnames:
+                    continue
+                self._log_move_action(message, rule_id, rules[query],
+                                       self.dry_run, folder=False)
+                for fname in to_move_fnames:
+                    if self.dry_run:
+                        continue
+                    try:
+                        shutil.copy2(fname, self._get_new_name(fname, destination))
+                        to_delete_fnames.append(fname)
+                    except shutil.Error as e:
+                        # this is ugly, but shutil does not provide more
+                        # finely individuated errors
+                        if str(e).endswith("already exists"):
+                            continue
+                        else:
+                            raise
+
+        # remove mail from source locations only after all copies are finished
+        for fname in set(to_delete_fnames):
+            os.remove(fname)
+
+        # update notmuch database
+        logging.info("updating database")
+        if not self.dry_run:
+            self._update_db(rule_id)
+        else:
+            logging.info("Would update database")
+
+
 class FolderMailMover(MailMover):
     def __init__(self, max_age=0, rename=False, dry_run=False):
         query = 'folder:{folder} AND {subquery}'
