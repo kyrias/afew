@@ -24,13 +24,14 @@ settings.read(os.path.join(user_config_dir, 'config'))
 # All the values for keys listed here are interpreted as ;-delimited lists
 value_is_a_list = ['tags', 'tags_blacklist']
 folder_mail_mover_section = 'MailMover'
+query_mail_mover_section = 'QueryMailMover'
 
 section_re = re.compile(r'^(?P<name>[a-z_][a-z0-9_]*)(\((?P<parent_class>[a-z_][a-z0-9_]*)\)|\.(?P<index>\d+))?$', re.I)
 def get_filter_chain(database):
     filter_chain = []
 
     for section in settings.sections():
-        if section in ['global', folder_mail_mover_section]:
+        if section in ['global', folder_mail_mover_section, query_mail_mover_section]:
             continue
 
         match = section_re.match(section)
@@ -68,6 +69,8 @@ def get_mail_move_kind():
 def get_mail_move_section(kind):
     if kind == 'folder':
         return folder_mail_mover_section
+    elif kind == 'query':
+        return query_mail_mover_section
 
 def get_mail_move_rules(kind):
     section = get_mail_move_section(kind)

@@ -127,3 +127,21 @@ class FolderMailMover(AbstractMailMover):
             # places; only touch the one(s) that exists in this maildir
             for fname in [fname for fname in message.get_filenames() if maildir in fname]:
                 yield (message, fname)
+
+
+class QueryMailMover(AbstractMailMover):
+    def __init__(self, max_age=0, *args, **kwargs):
+        super(QueryMailMover, self).__init__(*args, **kwargs)
+        self.query = '{subquery}'
+        if max_age:
+            days = timedelta(int(max_age))
+            start = date.today() - days
+            now = datetime.now()
+            self.query += ' AND {start}..{now}'.format(start=start.strftime('%s'),
+                                                       now=now.strftime('%s'))
+
+    def find_matching(self, rule_name, query):
+        main_query = self.query.format(subquery=query)
+        for message in self.db.do_query(main_query).search_messages():
+            for fname in [fname for fname in message.get_filenames()]:
+                yield (message, fname)

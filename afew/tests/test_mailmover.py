@@ -161,3 +161,65 @@ class TestFolderMailMover(MailMoverTestBaseClass, unittest.TestCase):
             self.assertEqual(expect_inbox, self.get_folder_content(db, '.inbox'))
             self.assertEqual(expect_archive, self.get_folder_content(db, '.archive'))
             self.assertEqual(expect_spam, self.get_folder_content(db, '.spam'))
+
+
+@freeze_time("2019-01-30 12:00:00")
+class TestQueryMailMover(MailMoverTestBaseClass, unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(TestQueryMailMover, self).__init__(*args, **kwargs)
+
+        # Dict of rules that are passed to QueryMailMover.
+        #
+        # The top level key is an arbitrary string only used for grouping rules together.
+        #
+        # The second level key is the notmuch query that QueryMailMover will execute,
+        # and its value is the directory to move the matching emails to.
+        self.rules = {
+            'inbox': {
+                'tag:inbox AND NOT folder:.inbox': '.inbox',
+                'NOT tag:archive AND folder:.archive': '.inbox',
+                'NOT tag:spam AND folder:.spam': '.inbox',
+            },
+            'archive': {
+                'tag:archive AND NOT folder:.archive': '.archive',
+            },
+            'spam': {
+                'tag:spam AND NOT folder:.spam': '.spam',
+            },
+        }
+
+
+    def test_all_rule_cases(self):
+        from afew import MailMover
+
+        with Database() as db:
+            expect_inbox = set([
+                create_mail('In inbox, untagged\n', self.inbox, db, []),
+                create_mail('In archive, untagged\n', self.archive, db, []),
+                create_mail('In spam, untagged\n', self.spam, db, []),
+            ])
+
+            expect_archive = set([
+                create_mail('In inbox, tagged archive\n', self.inbox, db, ['archive']),
+                create_mail('In archive, tagged archive\n', self.archive, db, ['archive']),
+                create_mail('In spam, tagged archive\n', self.spam, db, ['archive']),
+            ])
+
+            expect_spam = set([
+                create_mail('In inbox, tagged spam\n', self.inbox, db, ['spam']),
+                create_mail('In inbox, tagged archive, spam\n', self.inbox, db, ['archive', 'spam']),
+                create_mail('In archive, tagged spam\n', self.archive, db, ['spam']),
+                create_mail('In archive, tagged archive, spam\n', self.archive, db, ['archive', 'spam']),
+                create_mail('In spam, tagged spam\n', self.spam, db, ['spam']),
+                create_mail('In spam, tagged archive, spam\n', self.spam, db, ['archive', 'spam']),
+            ])
+
+        mover = MailMover.QueryMailMover(quiet=True)
+        mover.move('.inbox', self.rules['inbox'])
+        mover.move('.archive', self.rules['archive'])
+        mover.move('.spam', self.rules['spam'])
+
+        with Database() as db:
+            self.assertEqual(expect_inbox, self.get_folder_content(db, '.inbox'))
+            self.assertEqual(expect_archive, self.get_folder_content(db, '.archive'))
+            self.assertEqual(expect_spam, self.get_folder_content(db, '.spam'))

@@ -3,7 +3,7 @@
 
 import sys
 
-from afew.MailMover import FolderMailMover
+from afew.MailMover import FolderMailMover, QueryMailMover
 
 try:
     from .files import watch_for_new_files, quick_find_dirs_hack
@@ -26,6 +26,8 @@ def main(options, database, query_string):
     elif options.move_mails:
         if options.mail_move_kind == 'folder':
             mover_class = FolderMailMover
+        elif options.mail_move_kind == 'query':
+            mover_class = QueryMailMover
         else:
             sys.exit('Mail mover kind {:r} is not recognized'.format(options.mail_move_kind))
 
